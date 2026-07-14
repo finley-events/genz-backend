@@ -60,14 +60,25 @@ class ConnectView(APIView):
     permission_classes = []
 
     def get(self, request):
+        logger.info("=" * 80)
+        logger.info("Starting Deriv OAuth connection flow.")
 
         try:
-            # Remove expired OAuth sessions
-            DerivOAuthSession.objects.filter(expires_at__lt=timezone.now()).delete()
+            deleted, _ = DerivOAuthSession.objects.filter(
+                expires_at__lt=timezone.now()
+            ).delete()
+
+            logger.info("Expired OAuth sessions deleted: %s", deleted)
 
             oauth_service = DerivOAuthService()
 
+            logger.info("Generating PKCE credentials...")
+
             oauth_data = oauth_service.create_authorization()
+
+            logger.info("OAuth data generated successfully.")
+            logger.info("State: %s", oauth_data["state"])
+            logger.info("Authorization URL: %s", oauth_data["authorization_url"])
 
             DerivOAuthSession.objects.create(
                 state=oauth_data["state"],
@@ -75,6 +86,9 @@ class ConnectView(APIView):
                 expires_at=timezone.now() + timedelta(minutes=10),
                 used=False,
             )
+
+            logger.info("OAuth session stored successfully.")
+            logger.info("=" * 80)
 
             return Response(
                 {
@@ -85,13 +99,13 @@ class ConnectView(APIView):
                 status=status.HTTP_200_OK,
             )
 
-        except Exception as exc:
+        except Exception:
+            logger.exception("Failed to start Deriv OAuth flow.")
 
             return Response(
                 {
                     "success": False,
                     "message": "Unable to start the Deriv OAuth flow.",
-                    "error": str(exc),
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
