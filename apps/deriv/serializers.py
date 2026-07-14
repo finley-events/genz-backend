@@ -1,7 +1,5 @@
 from rest_framework import serializers
 
-from .models import DerivAccount
-
 
 class AuthorizeSerializer(serializers.Serializer):
     """
@@ -123,30 +121,6 @@ class HistorySerializer(serializers.Serializer):
         min_value=1,
         max_value=5000,
     )
-
-
-class DerivAccountSerializer(serializers.ModelSerializer):
-    """
-    Serialize connected Deriv account.
-    """
-
-    class Meta:
-        model = DerivAccount
-        fields = [
-            "id",
-            "login_id",
-            "deriv_user_id",
-            "email",
-            "currency",
-            "country",
-            "landing_company",
-            "is_virtual",
-            "is_connected",
-            "last_synced",
-            "created_at",
-            "updated_at",
-        ]
-        read_only_fields = fields
 
 
 class DisconnectSerializer(serializers.Serializer):

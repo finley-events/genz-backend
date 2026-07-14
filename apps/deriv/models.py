@@ -52,102 +52,30 @@ class DerivOAuthSession(TimeStampedModel):
         return self.state
 
 
-class DerivAccount(TimeStampedModel):
-    """
-    Connected Deriv trading account.
-    """
+class DerivConnection(TimeStampedModel):
 
     id = models.UUIDField(
         primary_key=True,
         default=uuid4,
         editable=False,
-    )
-
-    login_id = models.CharField(
-        max_length=50,
-        unique=True,
-    )
-
-    deriv_user_id = models.CharField(
-        max_length=100,
-        db_index=True,
-    )
-
-    email = models.EmailField(
-        blank=True,
-    )
-
-    currency = models.CharField(
-        max_length=10,
-    )
-
-    country = models.CharField(
-        max_length=100,
-        blank=True,
-    )
-
-    landing_company = models.CharField(
-        max_length=100,
-        blank=True,
-    )
-
-    is_virtual = models.BooleanField(
-        default=False,
-    )
-
-    is_connected = models.BooleanField(
-        default=True,
     )
 
     access_token = models.TextField()
 
-    token_expires_at = models.DateTimeField(
-        null=True,
-        blank=True,
+    token_type = models.CharField(
+        max_length=20,
+        default="Bearer",
     )
 
-    last_synced = models.DateTimeField(
-        null=True,
-        blank=True,
-    )
-
-    class Meta:
-        db_table = "deriv_accounts"
-        ordering = ["-created_at"]
-
-    def __str__(self):
-        return self.login_id
-
-
-class TradingSession(TimeStampedModel):
-    """
-    Tracks active user sessions on the trading platform.
-    """
-
-    id = models.UUIDField(
-        primary_key=True,
-        default=uuid4,
-        editable=False,
-    )
-
-    deriv_account = models.ForeignKey(
-        DerivAccount,
-        on_delete=models.CASCADE,
-        related_name="sessions",
-    )
-
-    session_id = models.CharField(
+    scopes = models.CharField(
         max_length=255,
-        unique=True,
-    )
-
-    ip_address = models.GenericIPAddressField(
-        null=True,
         blank=True,
     )
 
-    user_agent = models.TextField(
-        blank=True,
+    token_expires_at = models.DateTimeField()
+
+    is_connected = models.BooleanField(
+        default=True,
     )
 
     connected_at = models.DateTimeField(
@@ -159,18 +87,58 @@ class TradingSession(TimeStampedModel):
         blank=True,
     )
 
-    last_activity = models.DateTimeField(
+    last_synced = models.DateTimeField(
         null=True,
         blank=True,
     )
 
-    is_active = models.BooleanField(
-        default=True,
+    raw_token = models.JSONField(
+        default=dict,
+        blank=True,
     )
 
-    class Meta:
-        db_table = "deriv_trading_sessions"
-        ordering = ["-connected_at"]
 
-    def __str__(self):
-        return f"{self.deriv_account.login_id} ({self.session_id})"
+
+class DerivTradingAccount(TimeStampedModel):
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid4,
+        editable=False,
+    )
+
+    connection = models.ForeignKey(
+        DerivConnection,
+        related_name="accounts",
+        on_delete=models.CASCADE,
+    )
+
+    account_id = models.CharField(
+        max_length=50,
+        unique=True,
+    )
+
+    account_type = models.CharField(
+        max_length=20,
+    )
+
+    currency = models.CharField(
+        max_length=10,
+    )
+
+    balance = models.DecimalField(
+        max_digits=20,
+        decimal_places=2,
+    )
+
+    group = models.CharField(
+        max_length=50,
+    )
+
+    status = models.CharField(
+        max_length=30,
+    )
+
+    raw_data = models.JSONField(
+        default=dict,
+        blank=True,
+    )

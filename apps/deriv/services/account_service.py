@@ -7,7 +7,10 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from apps.deriv.models import DerivAccount
+from apps.deriv.models import (
+    DerivConnection,
+    DerivTradingAccount,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -150,39 +153,38 @@ class DerivAccountService:
 
         return self._get("/trading/v1/options/accounts")
 
+    def get_trading_accounts(self) -> list[dict[str, Any]]:
+        """
+        Returns every trading account associated with the OAuth connection.
+        """
+
+        response = self.get_accounts()
+
+        return response.get("data", [])
+
     def get_primary_account(self) -> dict[str, Any]:
         """
-        Returns the primary trading account.
+        Returns the first trading account.
         """
 
         logger.info("Selecting primary account...")
 
-        accounts = self.get_accounts()
+        response = self.get_accounts()
 
         logger.info("Accounts response:")
-        logger.info(accounts)
+        logger.info(response)
 
-        if isinstance(accounts, list):
-            logger.info("Accounts response is a list.")
+        if "data" not in response:
+            raise ValueError("Deriv response does not contain a 'data' field.")
 
-            if not accounts:
-                raise ValueError("Deriv returned an empty accounts list.")
+        accounts = response["data"]
 
-            account = cast(list[dict[str, Any]], accounts)[0]
+        if not accounts:
+            raise ValueError("No trading accounts returned.")
 
-        elif "accounts" in accounts:
-            logger.info("Accounts response contains 'accounts' key.")
+        account = accounts[0]
 
-            if not accounts["accounts"]:
-                raise ValueError("Accounts array is empty.")
-
-            account = accounts["accounts"][0]
-
-        else:
-            logger.info("Accounts response is a single object.")
-            account = accounts
-
-        logger.info("Primary account selected:")
+        logger.info("Primary account:")
         logger.info(account)
 
         return account
@@ -196,29 +198,76 @@ class DerivAccountService:
 
         return self._get("/trading/v1/profile")
 
-    def create_account(
+    @transaction.atomic
+    def save_connection(
         self,
-        currency: str,
-        group: str,
-        account_type: str,
-    ) -> dict[str, Any]:
+        token: dict[str, Any],
+    ) -> DerivConnection:
         """
-        Create a trading account.
+        Save the OAuth connection and synchronize trading accounts.
         """
 
-        payload = {
-            "currency": currency,
-            "group": group,
-            "account_type": account_type,
-        }
+        logger.info("=" * 80)
+        logger.info("Saving Deriv connection...")
 
-        logger.info("Creating account with payload:")
-        logger.info(payload)
-
-        return self._post(
-            "/trading/v1/options/accounts",
-            payload,
+        expires_at = timezone.now() + timezone.timedelta(
+            seconds=token.get("expires_in", 3600),
         )
+
+        accounts = self.get_trading_accounts()
+
+        if not accounts:
+            raise ValueError("No trading accounts returned by Deriv.")
+
+        primary_account = accounts[0]
+
+        connection, created = DerivConnection.objects.update_or_create(
+            access_token=token["access_token"],
+            defaults={
+                "token_type": token.get("token_type", "Bearer"),
+                "scopes": token.get("scope", ""),
+                "token_expires_at": expires_at,
+                "is_connected": True,
+                "last_synced": timezone.now(),
+                "raw_token": token,
+            },
+        )
+
+        logger.info(
+            "Connection saved. Created=%s",
+            created,
+        )
+
+        logger.info("Synchronizing %s trading accounts...", len(accounts))
+
+        for account in accounts:
+
+            trading_account, created = (
+                DerivTradingAccount.objects.update_or_create(
+                    account_id=account["account_id"],
+                    defaults={
+                        "connection": connection,
+                        "account_type": account["account_type"],
+                        "currency": account["currency"],
+                        "balance": account["balance"],
+                        "group": account["group"],
+                        "status": account["status"],
+                        "raw_data": account,
+                    },
+                )
+            )
+
+            logger.info(
+                "Account synchronized: %s (%s) Created=%s",
+                trading_account.account_id,
+                trading_account.account_type,
+                created,
+            )
+
+        logger.info("Synchronization complete.")
+        logger.info("=" * 80)
+
+        return connection
 
     def get_balance(self) -> dict[str, Any]:
         logger.info("Fetching balance...")
@@ -242,78 +291,7 @@ class DerivAccountService:
 
     # ----------------------------------------------------
     # DATABASE
-    # ----------------------------------------------------
-
-    @transaction.atomic
-    def save_account(
-        self,
-        account_data: dict[str, Any],
-        access_token: str,
-        expires_in: int,
-    ) -> DerivAccount:
-        """
-        Create or update a connected Deriv account.
-        """
-
-        logger.info("=" * 80)
-        logger.info("Saving Deriv account...")
-        logger.info("Raw account data:")
-        logger.info(account_data)
-
-        expires_at = timezone.now() + timezone.timedelta(
-            seconds=expires_in,
-        )
-
-        logger.info("Expires at: %s", expires_at)
-
-        logger.info("Available account keys:")
-        logger.info(list(account_data.keys()))
-
-        logger.info("loginid: %s", account_data.get("loginid"))
-        logger.info("user_id: %s", account_data.get("user_id"))
-        logger.info("email: %s", account_data.get("email"))
-        logger.info("currency: %s", account_data.get("currency"))
-        logger.info("country: %s", account_data.get("country"))
-        logger.info("landing_company: %s", account_data.get("landing_company"))
-        logger.info("is_virtual: %s", account_data.get("is_virtual"))
-
-        try:
-            account, created = DerivAccount.objects.update_or_create(
-                login_id=account_data["loginid"],
-                defaults={
-                    "deriv_user_id": account_data["user_id"],
-                    "email": account_data.get("email", ""),
-                    "currency": account_data["currency"],
-                    "country": account_data.get("country", ""),
-                    "landing_company": account_data.get(
-                        "landing_company",
-                        "",
-                    ),
-                    "is_virtual": account_data.get(
-                        "is_virtual",
-                        False,
-                    ),
-                    "is_connected": True,
-                    "access_token": access_token,
-                    "token_expires_at": expires_at,
-                    "last_synced": timezone.now(),
-                },
-            )
-
-            logger.info(
-                "Database save successful. Created=%s LoginID=%s",
-                created,
-                account.login_id,
-            )
-
-            logger.info("=" * 80)
-
-            return account
-
-        except Exception:
-            logger.exception("Failed to save Deriv account.")
-            raise
-
+    # ---------------------------------------------------
     # ----------------------------------------------------
     # FUTURE METHODS
     # ----------------------------------------------------
