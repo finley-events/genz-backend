@@ -43,6 +43,9 @@ from rest_framework.views import APIView
 
 from apps.deriv.models import DerivOAuthSession
 from apps.deriv.services.oauth_service import DerivOAuthService
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class ConnectView(APIView):
@@ -104,9 +107,14 @@ class CallbackView(APIView):
 
     def get(self, request):
 
+        logger.info("=" * 80)
+        logger.info("DERIV OAUTH CALLBACK RECEIVED")
+
         error = request.GET.get("error")
 
         if error:
+            logger.error("Deriv returned OAuth error: %s", error)
+
             return redirect(
                 f"{settings.FRONTEND_URL}/auth/deriv?" f"success=false&error={error}"
             )
@@ -114,20 +122,31 @@ class CallbackView(APIView):
         code = request.GET.get("code")
         state = request.GET.get("state")
 
+        logger.info(
+            "Authorization code received: %s", code[:15] + "..." if code else None
+        )
+        logger.info("State received: %s", state)
+
         if not code or not state:
+            logger.error("Missing code or state in callback.")
+
             return redirect(
                 f"{settings.FRONTEND_URL}/auth/deriv?"
                 "success=false&error=invalid_callback"
             )
 
         try:
+            logger.info("Looking up OAuth session...")
 
             oauth_session = DerivOAuthSession.objects.get(
                 state=state,
                 used=False,
             )
 
+            logger.info("OAuth session found.")
+
         except DerivOAuthSession.DoesNotExist:
+            logger.exception("OAuth session not found.")
 
             return redirect(
                 f"{settings.FRONTEND_URL}/auth/deriv?"
@@ -135,6 +154,7 @@ class CallbackView(APIView):
             )
 
         if oauth_session.is_expired:
+            logger.error("OAuth session has expired.")
 
             oauth_session.delete()
 
@@ -144,31 +164,54 @@ class CallbackView(APIView):
             )
 
         try:
+            logger.info("Exchanging authorization code for access token...")
 
             token = DerivTokenService.exchange_code(
                 code=code,
                 code_verifier=oauth_session.code_verifier,
             )
 
+            logger.info("Token exchange successful.")
+
             access_token = token["access_token"]
             expires_in = token.get("expires_in", 3600)
 
+            logger.info("Access token obtained.")
+            logger.info("Expires in: %s", expires_in)
+
+            logger.info("Creating DerivAccountService...")
+
             account_service = DerivAccountService(access_token)
+
+            logger.info("Fetching primary account...")
 
             account_data = account_service.get_primary_account()
 
-            account_service.save_account(
+            logger.info("Primary account returned:")
+            logger.info(account_data)
+
+            logger.info("Saving account...")
+
+            account = account_service.save_account(
                 account_data=account_data,
                 access_token=access_token,
                 expires_in=expires_in,
             )
 
+            logger.info("Account saved successfully.")
+            logger.info("Database Login ID: %s", account.login_id)
+
             oauth_session.used = True
             oauth_session.save(update_fields=["used"])
+
+            logger.info("OAuth session marked as used.")
+            logger.info("Redirecting to frontend with success=true")
+            logger.info("=" * 80)
 
             return redirect(f"{settings.FRONTEND_URL}/auth/deriv?" "success=true")
 
         except Exception:
+            logger.exception("OAuth callback failed.")
 
             return redirect(
                 f"{settings.FRONTEND_URL}/auth/deriv?"
