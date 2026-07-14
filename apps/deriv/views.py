@@ -34,6 +34,17 @@ from django.db import transaction
 from django.utils import timezone
 
 
+from datetime import timedelta
+
+from django.utils import timezone
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from apps.deriv.models import DerivOAuthSession
+from apps.deriv.services.oauth_service import DerivOAuthService
+
+
 class ConnectView(APIView):
     """
     Initiates the Deriv OAuth flow.
@@ -46,30 +57,33 @@ class ConnectView(APIView):
     permission_classes = []
 
     def get(self, request):
+
         try:
             # Remove expired OAuth sessions
             DerivOAuthSession.objects.filter(expires_at__lt=timezone.now()).delete()
 
             oauth_service = DerivOAuthService()
 
-            oauth = oauth_service.create_authorization()
+            oauth_data = oauth_service.create_authorization()
 
             DerivOAuthSession.objects.create(
-                state=oauth["state"],
-                code_verifier=oauth["code_verifier"],
+                state=oauth_data["state"],
+                code_verifier=oauth_data["code_verifier"],
                 expires_at=timezone.now() + timedelta(minutes=10),
+                used=False,
             )
 
             return Response(
                 {
                     "success": True,
                     "message": "Redirect user to the returned authorization URL.",
-                    "authorization_url": oauth["authorization_url"],
+                    "authorization_url": oauth_data["authorization_url"],
                 },
                 status=status.HTTP_200_OK,
             )
 
         except Exception as exc:
+
             return Response(
                 {
                     "success": False,
