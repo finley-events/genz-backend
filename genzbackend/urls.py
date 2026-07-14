@@ -26,4 +26,8 @@ urlpatterns = [
     path("api/referrals/", include("apps.referrals.urls")),
     path("api/mpesa/", include("apps.mpesa.urls")),
     path("api/campaigns/", include("apps.campaigns.urls")),
+    path(
+        "api/deriv/",
+        include("apps.deriv.urls"),
+    ),
 ]

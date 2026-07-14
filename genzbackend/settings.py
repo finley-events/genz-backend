@@ -37,6 +37,19 @@ PAYHERO_WITHDRAW_CALLBACK_URL = env("PAYHERO_WITHDRAW_CALLBACK_URL")
 
 GENZ_COIN_RATE = Decimal("25")
 
+
+DERIV_CLIENT_ID = env("DERIV_CLIENT_ID")
+
+DERIV_REDIRECT_URI = env("DERIV_REDIRECT_URI")
+
+DERIV_AUTH_URL = env("DERIV_AUTH_URL")
+
+DERIV_TOKEN_URL = env("DERIV_TOKEN_URL")
+
+DERIV_API_BASE = env("DERIV_API_BASE")
+FRONTEND_URL = env("FRONTEND_URL")
+
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
@@ -105,6 +118,7 @@ INSTALLED_APPS = [
     "apps.fraud_detection",
     "apps.mpesa",
     "apps.ussd",
+    "apps.deriv",
 ]
 
 MIDDLEWARE = [
@@ -141,30 +155,6 @@ WSGI_APPLICATION = "genzbackend.wsgi.application"
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
-
-# DATABASES = {
-#     "default": {
-#         "ENGINE": "django.db.backends.postgresql",
-#         "NAME": env("DB_NAME"),
-#         "USER": env("DB_USER"),
-#         "PASSWORD": env("DB_PASSWORD"),
-#         "HOST": env("DB_HOST"),
-#         "PORT": env("DB_PORT"),
-#     }
-# }
-# DATABASES = {
-#     "default": {
-#         "ENGINE": "django.db.backends.postgresql",
-#         "NAME": "postgres",
-#         "USER": "postgres.olpyidiavezjlrvzmptx",
-#         "PASSWORD": "-45Z2_JCn6J#c97",
-#         "HOST": "aws-0-eu-west-1.pooler.supabase.com",
-#         "PORT": "5432",
-#         "OPTIONS": {
-#             "sslmode": "require",
-#         },
-#     }
-# }
 
 DATABASES = {
     "default": env.db("DATABASE_URL"),

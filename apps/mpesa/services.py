@@ -165,11 +165,11 @@ class MpesaService:
             "external_reference": reference,
             "amount": float(amount_kes),
             "phone_number": phone_number,
-            "network_code": "63902",
-            "callback_url": (settings.PAYHERO_WITHDRAW_CALLBACK_URL),
-            "channel": "mobile",
+
+            "callback_url": "https://webhook.site/f14867a1-64e1-499f-a6b4-a261124667fb",
+
             "channel_id": settings.PAYHERO_CHANNEL_ID,
-            "payment_service": "b2c",
+
         }
 
         payment.raw_request = payload
