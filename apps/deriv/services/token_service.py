@@ -4,15 +4,19 @@ from django.conf import settings
 
 
 class DerivTokenService:
+    """
+    Handles exchanging Deriv OAuth authorization codes
+    for access tokens.
+    """
 
     @staticmethod
     def exchange_code(
         code: str,
         code_verifier: str,
-    ):
+    ) -> dict:
         """
-        Exchange an authorization code
-        for an OAuth access token.
+        Exchange authorization code for Deriv access token
+        using PKCE.
         """
 
         payload = {
@@ -23,12 +27,26 @@ class DerivTokenService:
             "redirect_uri": settings.DERIV_REDIRECT_URI,
         }
 
-        response = requests.post(
-            settings.DERIV_TOKEN_URL,
-            data=payload,
-            timeout=30,
-        )
+        try:
+            response = requests.post(
+                settings.DERIV_TOKEN_URL,
+                data=payload,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                timeout=30,
+            )
 
-        response.raise_for_status()
+        except requests.RequestException as exc:
+            raise Exception(f"Unable to connect to Deriv token endpoint: {exc}")
 
-        return response.json()
+        if not response.ok:
+            raise Exception(
+                f"Deriv token exchange failed "
+                f"({response.status_code}): {response.text}"
+            )
+
+        data = response.json()
+
+        if "access_token" not in data:
+            raise Exception(f"Deriv response missing access token: {data}")
+
+        return data
