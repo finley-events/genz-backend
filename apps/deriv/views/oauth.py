@@ -13,9 +13,9 @@ from rest_framework.views import APIView
 from apps.deriv.services.account_service import DerivAccountService
 from apps.deriv.services.websocket_service import DerivWebSocketService
 
-from .models import DerivOAuthSession, DerivTradingAccount
+from ..models import DerivOAuthSession, DerivTradingAccount
 
-from .serializers import (
+from ..serializers.serializers import (
     AuthorizeSerializer,
     BuySerializer,
     CandleSerializer,
@@ -26,9 +26,9 @@ from .serializers import (
     TickSerializer,
 )
 
-from .services.oauth_service import DerivOAuthService
+from ..services.oauth_service import DerivOAuthService
 
-from .services.token_service import DerivTokenService
+from ..services.token_service import DerivTokenService
 
 from django.db import transaction
 from django.utils import timezone

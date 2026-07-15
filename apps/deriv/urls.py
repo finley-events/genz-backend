@@ -1,6 +1,7 @@
 from django.urls import path
+from apps.deriv.views.otp import GenerateOTPView
 
-from .views import (
+from .views.oauth import (
     CallbackView,
     ConnectView,
 )
@@ -18,6 +19,11 @@ urlpatterns = [
         "callback/",
         CallbackView.as_view(),
         name="callback",
+    ),
+    path(
+        "accounts/<str:account_id>/otp/",
+        GenerateOTPView.as_view(),
+        name="deriv-generate-otp",
     ),
     #     path(
     #         "authorize/",

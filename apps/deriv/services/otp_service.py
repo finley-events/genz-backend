@@ -1,72 +1,43 @@
-from typing import Any
 import logging
 
-import requests
-
-from django.conf import settings
-
-from apps.deriv.models import DerivTradingAccount
+from apps.deriv.clients.deriv_rest_client import DerivRESTClient
 
 logger = logging.getLogger(__name__)
 
 
 class DerivOTPService:
     """
-    Generates a one-time password (OTP) for establishing an
-    authenticated Deriv Options WebSocket connection.
+    Generates a temporary authenticated WebSocket URL
+    for a specific Deriv trading account.
     """
 
-    def __init__(self, trading_account: DerivTradingAccount):
-        self.trading_account = trading_account
-        self.connection = trading_account.connection
+    def __init__(self, access_token: str):
+        self.client = DerivRESTClient(access_token)
 
-        self.base_url = settings.DERIV_API_BASE.rstrip("/")
-
-        self.headers = {
-            "Authorization": (f"Bearer {self.connection.access_token}"),
-            "Deriv-App-ID": settings.DERIV_CLIENT_ID,
-            "Accept": "application/json",
-        }
-
-    def generate_websocket_url(self) -> str:
-        """
-        Generate an authenticated WebSocket URL
-        for the selected trading account.
-        """
-
-        endpoint = (
-            f"{self.base_url}/trading/v1/options/accounts/"
-            f"{self.trading_account.account_id}/otp"
-        )
+    def generate(self, account_id: str) -> dict:
 
         logger.info("=" * 80)
-        logger.info("Generating WebSocket OTP...")
-        logger.info("Endpoint: %s", endpoint)
-        logger.info("Account ID: %s", self.trading_account.account_id)
+        logger.info("Generating OTP for account %s", account_id)
 
-        response = requests.post(
-            endpoint,
-            headers=self.headers,
-            timeout=30,
-        )
+        response = self.client.post(f"/trading/v1/options/accounts/{account_id}/otp")
 
-        logger.info("HTTP Status: %s", response.status_code)
-        logger.info("Response: %s", response.text)
+        logger.info("OTP Response:")
+        logger.info(response)
 
-        response.raise_for_status()
-
-        payload = response.json()
-
-        data = payload.get("data")
+        data = response.get("data")
 
         if not data:
-            raise ValueError("Missing 'data' in OTP response.")
+            raise ValueError("Deriv returned no data object.")
 
         websocket_url = data.get("url")
 
         if not websocket_url:
-            raise ValueError("Missing WebSocket URL in OTP response.")
+            raise ValueError("Deriv returned no websocket URL.")
 
-        logger.info("Successfully generated WebSocket URL.")
+        logger.info("WebSocket URL generated successfully.")
+        logger.info("=" * 80)
 
-        return websocket_url
+        return {
+            "account_id": account_id,
+            "websocket_url": websocket_url,
+        }
