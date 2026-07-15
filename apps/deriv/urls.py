@@ -1,4 +1,5 @@
 from django.urls import path
+from apps.deriv.views.accounts import AccountsView
 from apps.deriv.views.connection import ConnectionView
 from apps.deriv.views.otp import GenerateOTPView
 
@@ -20,6 +21,11 @@ urlpatterns = [
         "callback/",
         CallbackView.as_view(),
         name="callback",
+    ),
+    path(
+        "accounts/",
+        AccountsView.as_view(),
+        name="deriv-accounts",
     ),
     path(
         "accounts/<str:account_id>/otp/",
