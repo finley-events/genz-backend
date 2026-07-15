@@ -1,4 +1,5 @@
 from django.urls import path
+from apps.deriv.views.connection import ConnectionView
 from apps.deriv.views.otp import GenerateOTPView
 
 from .views.oauth import (
@@ -24,6 +25,11 @@ urlpatterns = [
         "accounts/<str:account_id>/otp/",
         GenerateOTPView.as_view(),
         name="deriv-generate-otp",
+    ),
+    path(
+        "connection/",
+        ConnectionView.as_view(),
+        name="deriv-connection",
     ),
     #     path(
     #         "authorize/",
